@@ -35,9 +35,22 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Extract and build APK
+      - name: Extract source
         run: |
           unzip -o ElapsedTimeTrackerAndroid_WithWidget.zip -d project
+
+      - name: Fix Java and Kotlin versions
+        run: |
+          cd project/ElapsedTimeTrackerAndroid
+          find . -name '*.gradle' -o -name '*.gradle.kts'
+          sed -i 's/JVM_1_8/JVM_17/g' app/build.gradle app/build.gradle.kts 2>/dev/null || true
+          sed -i 's/jvmTarget = "1.8"/jvmTarget = "17"/g' app/build.gradle app/build.gradle.kts 2>/dev/null || true
+          sed -i "s/jvmTarget = '1.8'/jvmTarget = '17'/g" app/build.gradle app/build.gradle.kts 2>/dev/null || true
+          sed -i 's/JavaVersion.VERSION_1_8/JavaVersion.VERSION_17/g' app/build.gradle app/build.gradle.kts 2>/dev/null || true
+          sed -i 's/JavaVersion.VERSION_1_8/JavaVersion.VERSION_17/g' build.gradle build.gradle.kts 2>/dev/null || true
+
+      - name: Build APK
+        run: |
           cd project/ElapsedTimeTrackerAndroid
           gradle assembleDebug
 
@@ -47,3 +60,4 @@ jobs:
           name: elapsed-time-tracker-apk
           path: project/ElapsedTimeTrackerAndroid/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          
