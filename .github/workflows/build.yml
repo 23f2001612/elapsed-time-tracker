@@ -37,62 +37,26 @@ jobs:
       - name: Extract source
         run: |
           unzip -o ElapsedTimeTrackerAndroid_WithWidget.zip -d project
+          test -d project/ElapsedTimeTrackerAndroid
 
-      - name: Align Java and Kotlin JVM targets
+      - name: Force Java and Kotlin to target JVM 17
         shell: bash
         run: |
-          cd project/ElapsedTimeTrackerAndroid
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          files = list(Path('.').rglob('*.gradle')) + list(Path('.').rglob('*.gradle.kts'))
-          print("Gradle files found:")
-          for path in files:
-              text = path.read_text()
-              original = text
-
-              # Make Java compile compatibility use Java 17.
-              text = text.replace('JavaVersion.VERSION_1_8', 'JavaVersion.VERSION_17')
-              text = text.replace('JavaVersion.VERSION_1_8', 'JavaVersion.VERSION_17')
-              text = re.sub(r'(sourceCompatibility\s*[= ]\s*)VERSION_1_8', r'\1VERSION_17', text)
-              text = re.sub(r'(targetCompatibility\s*[= ]\s*)VERSION_1_8', r'\1VERSION_17', text)
-              text = re.sub(r'(jvmTarget\s*=\s*)["\']1\.8["\']', r'\1"17"', text)
-              text = re.sub(r'(JavaVersion\.VERSION_)1_8', r'\g<1>17', text)
-
-              if text != original:
-                  path.write_text(text)
-                  print(f"Updated: {path}")
-              else:
-                  print(f"Checked: {path}")
-
-          # Ensure JavaCompile tasks use the same JVM target as Kotlin.
-          app_gradle = Path('app/build.gradle')
-          if app_gradle.exists():
-              text = app_gradle.read_text()
-              if 'compileOptions' not in text:
-                  text += """
-          
-          android {
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
+          cat > /tmp/force-jvm17.gradle <<'EOF'
+          allprojects {
+              tasks.withType(JavaCompile).configureEach {
+                  sourceCompatibility = '17'
+                  targetCompatibility = '17'
+              }
+              tasks.configureEach {
+                  if (name.toLowerCase().contains('kotlin') && hasProperty('kotlinOptions')) {
+                      kotlinOptions.jvmTarget = '17'
+                  }
               }
           }
-          """
-              app_gradle.write_text(text)
-              print("Ensured Java 17 compileOptions in app/build.gradle")
-          PY
-
-      - name: Show Java/Kotlin target settings
-        run: |
+          EOF
           cd project/ElapsedTimeTrackerAndroid
-          grep -R -n -E 'sourceCompatibility|targetCompatibility|jvmTarget|VERSION_1_8|VERSION_17' --include='*.gradle' --include='*.gradle.kts' .
-
-      - name: Build APK
-        run: |
-          cd project/ElapsedTimeTrackerAndroid
-          gradle assembleDebug
+          gradle -I /tmp/force-jvm17.gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
