@@ -37,26 +37,41 @@ jobs:
       - name: Extract source
         run: |
           unzip -o ElapsedTimeTrackerAndroid_WithWidget.zip -d project
-          test -d project/ElapsedTimeTrackerAndroid
+          test -f project/ElapsedTimeTrackerAndroid/app/build.gradle.kts
 
-      - name: Force Java and Kotlin to target JVM 17
-        shell: bash
+      - name: Set Java and Kotlin JVM targets to 17
         run: |
-          cat > /tmp/force-jvm17.gradle <<'EOF'
-          allprojects {
-              tasks.withType(JavaCompile).configureEach {
-                  sourceCompatibility = '17'
-                  targetCompatibility = '17'
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("project/ElapsedTimeTrackerAndroid/app/build.gradle.kts")
+          text = p.read_text()
+          marker = "android {"
+          if marker not in text:
+              raise SystemExit("Could not find android block in app/build.gradle.kts")
+
+          settings = """
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
               }
-              tasks.configureEach {
-                  if (name.toLowerCase().contains('kotlin') && hasProperty('kotlinOptions')) {
-                      kotlinOptions.jvmTarget = '17'
-                  }
+
+              kotlinOptions {
+                  jvmTarget = "17"
               }
-          }
-          EOF
+          """
+
+          if "sourceCompatibility = JavaVersion.VERSION_17" not in text:
+              text = text.replace(marker, marker + "\n" + settings, 1)
+
+          p.write_text(text)
+          print(p.read_text())
+          PY
+
+      - name: Build APK
+        run: |
           cd project/ElapsedTimeTrackerAndroid
-          gradle -I /tmp/force-jvm17.gradle assembleDebug
+          gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
