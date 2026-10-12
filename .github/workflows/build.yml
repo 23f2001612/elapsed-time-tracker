@@ -34,22 +34,20 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Extract source
+      - name: Extract source and fix widget context
         run: |
           unzip -o ElapsedTimeTrackerAndroid_WithWidget.zip -d project
-          test -f project/ElapsedTimeTrackerAndroid/app/build.gradle.kts
+          sed -i 's/ElapsedTimerWidgetProvider.refresh(this)/ElapsedTimerWidgetProvider.refresh(this@MainActivity)/g' project/ElapsedTimeTrackerAndroid/app/src/main/java/com/harry/elapsedtimetracker/MainActivity.kt
 
       - name: Set Java and Kotlin JVM targets to 17
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           p = Path("project/ElapsedTimeTrackerAndroid/app/build.gradle.kts")
           text = p.read_text()
           marker = "android {"
           if marker not in text:
               raise SystemExit("Could not find android block in app/build.gradle.kts")
-
           settings = """
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
@@ -60,12 +58,9 @@ jobs:
                   jvmTarget = "17"
               }
           """
-
           if "sourceCompatibility = JavaVersion.VERSION_17" not in text:
               text = text.replace(marker, marker + "\n" + settings, 1)
-
           p.write_text(text)
-          print(p.read_text())
           PY
 
       - name: Build APK
